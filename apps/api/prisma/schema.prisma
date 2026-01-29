@@ -1,0 +1,102 @@
+generator client {
+  provider   = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+// Định nghĩa trạng thái tài khoản
+enum UserStatus {
+  PENDING   // Đang chờ xác thực email
+  ACTIVE    // Đã kích hoạt
+  BANNED    // Bị khóa
+}
+
+model User {
+  id            String     @id @default(uuid())
+  email         String     @unique
+  password      String?    // Nullable nếu đăng nhập bằng Google
+  fullName      String?
+  avatar        String?
+  role          Role       @default(USER)
+  status        UserStatus @default(PENDING)
+  googleId      String?    @unique // Lưu ID từ Google OAuth
+  
+  // Quan hệ
+  posts         Post[]
+  comments      Comment[]
+  otpCodes      OtpCode[]  // Lưu mã xác thực gửi về mail
+  
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model OtpCode {
+  id        String   @id @default(uuid())
+  code      String   // Mã OTP (6 số) hoặc Token
+  expiresAt DateTime // Thời điểm hết hạn
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("otp_codes")
+}
+
+model Post {
+  id          String     @id @default(uuid())
+  title       String
+  slug        String     @unique // Đường dẫn thân thiện cho Blog (vd: bai-viet-hay)
+  content     String     @db.Text
+  published   Boolean    @default(false)
+  thumbnail   String?
+  
+  authorId    String
+  author      User       @relation(fields: [authorId], references: [id])
+  
+  categoryId  String?
+  category    Category?  @relation(fields: [categoryId], references: [id])
+  
+  tags        Tag[]      // Quan hệ n-n tự động của Prisma
+  comments    Comment[]
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@map("posts")
+}
+
+model Category {
+  id    String @id @default(uuid())
+  name  String @unique
+  posts Post[]
+
+  @@map("categories")
+}
+
+model Tag {
+  id    String @id @default(uuid())
+  name  String @unique
+  posts Post[]
+
+  @@map("tags")
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  
+  createdAt DateTime @default(now())
+
+  @@map("comments")
+}
